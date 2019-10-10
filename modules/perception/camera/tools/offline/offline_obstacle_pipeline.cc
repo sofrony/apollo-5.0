@@ -64,7 +64,7 @@ DEFINE_double(camera_fps, 15, "camera_fps");
 DEFINE_bool(do_undistortion, false, "do_undistortion");
 DEFINE_string(undistortion_save_dir, "./undistortion_result",
               "Directory to save undistored images.");
-DEFINE_string(save_dir, "./result",
+DEFINE_string(save_dir, "/apollo/result",
               "Directory to save result images with detections.");
 
 namespace apollo {
@@ -227,8 +227,8 @@ int work() {
     camera_name = temp_strs[0];
     image_name = temp_strs[1];
 
-    AINFO << "image: " << image_name << ", camera_name: " << camera_name;
     std::string image_path = FLAGS_image_root + image_name + FLAGS_image_ext;
+    AINFO << "image: " << image_path << ", camera_name: " << camera_name;
     cv::Mat image;
     if (FLAGS_image_color == "gray") {
       image = cv::imread(image_path, CV_LOAD_IMAGE_GRAYSCALE);
@@ -310,7 +310,7 @@ int work() {
 
     save_dir = FLAGS_save_dir;
     if (!cyber::common::PathExists(save_dir)) {
-      AERROR << "save_dir does not exist : " << save_dir;
+      AERROR << "save_dir does not exist : " <<cyber::common::GetCurrentPath() <<" / "<< save_dir ;
     } else {
       std::ofstream myfile;
       myfile.open(save_dir + "/" + image_name + ".txt");
