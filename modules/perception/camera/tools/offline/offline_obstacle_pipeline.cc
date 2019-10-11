@@ -96,7 +96,7 @@ void save_image(const std::string &path, base::Image8U &image) {  // NOLINT
   cv::imwrite(path, cv_img);
 }
 
-int work() {
+int work(std::string image_path) {
   // Init pipeline:
   ObstacleCameraPerception perception;
   CameraPerceptionInitOptions init_option;
@@ -227,7 +227,6 @@ int work() {
     camera_name = temp_strs[0];
     image_name = temp_strs[1];
 
-    std::string image_path = FLAGS_image_root + image_name + FLAGS_image_ext;
     AINFO << "image: " << image_path << ", camera_name: " << camera_name;
     cv::Mat image;
     if (FLAGS_image_color == "gray") {
@@ -352,5 +351,5 @@ int main(int argc, char *argv[]) {
       "command line brew\n"
       "Usage: camera_benchmark <args>\n");
 
-  return apollo::perception::camera::work();
+  return apollo::perception::camera::work(argv[1]);
 }

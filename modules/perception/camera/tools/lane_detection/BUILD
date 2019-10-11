@@ -35,6 +35,7 @@ cc_binary(
         "//modules/perception/base",
         "//modules/perception/camera/common",
         "//modules/perception/camera/lib/calibration_service/online_calibration_service",
+	"//modules/perception/camera/lib/calibrator/laneline:laneline_calibrator",
         "//modules/perception/camera/lib/interface",
         "//modules/perception/camera/lib/lane/detector/denseline:denseline_lane_detector",
         "//modules/perception/camera/lib/lane/postprocessor/denseline:denseline_lane_postprocessor",

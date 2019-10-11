@@ -32,15 +32,16 @@ namespace perception {
 namespace camera {
 
 using apollo::common::util::StrCat;
+static const std::string ROOT ="/apollo/modules/perception/testdata/camera/lib/lane/postprocessor/denseline/";
 
 int lane_postprocessor_eval() {
   //  initialize lane detector
   LaneDetectorInitOptions init_options;
   LaneDetectorOptions detetor_options;
   init_options.conf_file = "config.pt";
-  init_options.root_dir = "data/";
+  init_options.root_dir = ROOT+"./data/";
   base::BrownCameraDistortionModel model;
-  if (!common::LoadBrownCameraIntrinsic("params/front_6mm_intrinsics.yaml",
+  if (!common::LoadBrownCameraIntrinsic("/apollo/modules/perception/data/params/front_6mm_intrinsics.yaml",
                                         &model)) {
     AERROR << "LoadBrownCameraIntrinsic Error!";
     return -1;
@@ -54,14 +55,16 @@ int lane_postprocessor_eval() {
   std::shared_ptr<DenselineLanePostprocessor> lane_postprocessor;
   lane_postprocessor.reset(new DenselineLanePostprocessor);
   LanePostprocessorInitOptions postprocessor_init_options;
-  postprocessor_init_options.detect_config_root = "./data/";
+  postprocessor_init_options.detect_config_root = ROOT+"./data/";
   postprocessor_init_options.detect_config_name = "config.pt";
-  postprocessor_init_options.root_dir = "./data/";
+  postprocessor_init_options.root_dir = ROOT+"./data/";
   postprocessor_init_options.conf_file = "lane_postprocessor_config.pt";
   lane_postprocessor->Init(postprocessor_init_options);
   LanePostprocessorOptions postprocessor_options;
+  FLAGS_save_dir = "/apollo/result/";
   cyber::common::EnsureDirectory(FLAGS_save_dir);
 
+  FLAGS_list = "/apollo/lines.txt";
   // Read image list
   std::ifstream list_file(FLAGS_list.c_str());
   std::string imname;
@@ -77,6 +80,8 @@ int lane_postprocessor_eval() {
       debug_img_list.push_back(imname);
     }
   }
+  FLAGS_lane_line_debug = FLAGS_lane_cc_debug = FLAGS_lane_result_output = true;
+  AINFO << imnames.size() << " images to save to "<<FLAGS_save_dir;
 
   // Lane process for each image
   for (int i = 0; i < static_cast<int>(imnames.size()); ++i) {
@@ -126,37 +131,41 @@ int lane_postprocessor_eval() {
         "bgr8");
 
     // Set pitch angle
-    float pitch_angle = 0.0f;
     // Set camera_ground_height (unit:meter)
     float camera_ground_height = 1.6f;
     // frame.pitch_angle = pitch_angle;
     // frame.camera_ground_height = camera_ground_height;
     frame.camera_k_matrix = model.get_intrinsic_params();
-    CalibrationServiceInitOptions calibration_service_init_options;
-    calibration_service_init_options.calibrator_working_sensor_name =
-        "onsmi_obstacle";
+
+    CalibrationServiceInitOptions options;
     std::map<std::string, Eigen::Matrix3f> name_intrinsic_map;
-    name_intrinsic_map["onsmi_obstacle"] = frame.camera_k_matrix;
-    calibration_service_init_options.name_intrinsic_map = name_intrinsic_map;
-    calibration_service_init_options.calibrator_method = "LaneLineCalibrator";
-    calibration_service_init_options.image_height =
-        static_cast<int>(model.get_height());
-    calibration_service_init_options.image_width =
-        static_cast<int>(model.get_width());
+    name_intrinsic_map.insert(
+		    std::pair<std::string, Eigen::Matrix3f>("onsemi_obstacle", frame.camera_k_matrix));
+    options.name_intrinsic_map = name_intrinsic_map;
+    options.calibrator_working_sensor_name = "onsemi_obstacle";
+    options.calibrator_method = "LaneLineCalibrator";
+    options.image_height = static_cast<int>(model.get_height());
+    options.image_width =         static_cast<int>(model.get_width());
+
+
+
     std::shared_ptr<BaseCalibrationService> calibration_service;
-    calibration_service.reset(
-        BaseCalibrationServiceRegisterer::GetInstanceByName(
-            "OnlineCalibration"));
-    CHECK(calibration_service->Init(calibration_service_init_options));
+    calibration_service.reset( 
+		    BaseCalibrationServiceRegisterer::GetInstanceByName(
+			    "OnlineCalibrationService") );
+
+    CHECK(calibration_service->Init(options));
 
     std::map<std::string, float> name_camera_ground_height_map;
     std::map<std::string, float> name_camera_pitch_angle_diff_map;
-    name_camera_ground_height_map["onsmi_obstacle"] = camera_ground_height;
-    name_camera_pitch_angle_diff_map["onsmi_obstacle"] = 0;
+    name_camera_ground_height_map["onsemi_obstacle"] = camera_ground_height;
+    name_camera_pitch_angle_diff_map["onsemi_obstacle"] = 0;
+    float pitch_angle = 0.0f;
     calibration_service->SetCameraHeightAndPitch(
         name_camera_ground_height_map, name_camera_pitch_angle_diff_map,
         pitch_angle);
     frame.calibration_service = calibration_service.get();
+
     // Detect the lane image
     lib::Timer timer;
     timer.Start();
@@ -181,16 +190,26 @@ int lane_postprocessor_eval() {
 
     const std::vector<std::vector<LanePointInfo> >& detect_laneline_point_set =
         lane_postprocessor->GetLanelinePointSet();
+
+
+    AINFO  << "detect_laneline_point_set = "<<detect_laneline_point_set.size() ;
+for (size_t i=0; i<detect_laneline_point_set.size(); i++ ) {
+	AINFO  << "detect_laneline_point_set["<<i<<"] = "<<detect_laneline_point_set[i].size();
+}
+
     if (FLAGS_lane_line_debug) {
       save_img_path = StrCat(FLAGS_save_dir, "/", FLAGS_file_title, "_0_",
                              FLAGS_file_ext_name, ".jpg");
       const std::vector<LanePointInfo>& infer_point_set =
           lane_postprocessor->GetAllInferLinePointSet();
       show_all_infer_point_set(img, infer_point_set, save_img_path);
+	AINFO << "saved to "<<save_img_path;
 
       save_img_path = StrCat(FLAGS_save_dir, "/", FLAGS_file_title, "_1_",
                              FLAGS_file_ext_name, ".jpg");
       show_detect_point_set(img, detect_laneline_point_set, save_img_path);
+	AINFO << "saved to "<<save_img_path;
+
       AINFO << "detect_laneline_point_set num: "
             << detect_laneline_point_set.size();
     }
@@ -200,16 +219,19 @@ int lane_postprocessor_eval() {
                              FLAGS_file_ext_name, ".jpg");
       show_lane_ccs(lane_map, lane_map_width, lane_map_height, lane_ccs,
                     select_lane_ccs, save_img_path);
+	AINFO << "saved to "<<save_img_path;
     }
     if (FLAGS_lane_line_debug) {
       save_img_path = StrCat(FLAGS_save_dir, "/", FLAGS_file_title, "_5_",
                              FLAGS_file_ext_name, ".jpg");
       show_lane_lines(img, frame.lane_objects, save_img_path);
+	AINFO << "saved to "<<save_img_path;
     }
     if (FLAGS_lane_result_output) {
       std::string save_path =
           StrCat(FLAGS_save_dir, "/", FLAGS_file_title, ".txt");
       output_laneline_to_json(frame.lane_objects, save_path);
+	AINFO << "saved to "<<save_path;
     }
   }
 
