@@ -63,7 +63,7 @@ int lane_postprocessor_eval() {
   LanePostprocessorOptions postprocessor_options;
   FLAGS_save_dir = "/apollo/result/";
   FLAGS_list = "/apollo/lines.txt";
-  FLAGS_lane_line_debug = FLAGS_lane_cc_debug = FLAGS_lane_result_output = true;
+  FLAGS_lane_line_debug = FLAGS_lane_result_output = true;
   cyber::common::EnsureDirectory(FLAGS_save_dir);
 
   // Read image list
@@ -185,7 +185,7 @@ int lane_postprocessor_eval() {
 
     const std::vector<std::vector<LanePointInfo> >& detect_laneline_point_set =
         lane_postprocessor->GetLanelinePointSet();
-    if (FLAGS_lane_line_debug) {
+    if (FLAGS_lane_cc_debug) {
       save_img_path = StrCat(FLAGS_save_dir, "/", FLAGS_file_title, "_0_",
                              FLAGS_file_ext_name, ".jpg");
       const std::vector<LanePointInfo>& infer_point_set =
