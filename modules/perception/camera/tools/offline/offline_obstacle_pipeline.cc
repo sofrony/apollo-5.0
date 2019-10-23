@@ -41,12 +41,12 @@
 #include "modules/perception/common/io/io_util.h"
 
 DEFINE_string(test_list,
-              "/apollo/modules/perception/testdata/camera/lib/obstacle/"
-              "detector/yolo/img/full_test_list.txt",
+              "/apollo/"
+              "list.txt",
               "test image list");
 DEFINE_string(image_root,
-              "/apollo/modules/perception/testdata/camera/lib/obstacle/"
-              "detector/yolo/img/",
+              "/apollo/"
+              "img/",
               "root directory of images");
 DEFINE_string(image_ext, ".jpg", "extension of image name");
 DEFINE_string(image_color, "bgr", "color space of image");
@@ -96,7 +96,7 @@ void save_image(const std::string &path, base::Image8U &image) {  // NOLINT
   cv::imwrite(path, cv_img);
 }
 
-int work(std::string image_path) {
+int work() {
   // Init pipeline:
   ObstacleCameraPerception perception;
   CameraPerceptionInitOptions init_option;
@@ -226,8 +226,9 @@ int work(std::string image_path) {
     }
     camera_name = temp_strs[0];
     image_name = temp_strs[1];
+    std::string image_path = FLAGS_image_root + image_name + FLAGS_image_ext;
 
-    AINFO << "image: " << image_path << ", camera_name: " << camera_name;
+    AINFO << "image: " << image_name << ", camera_name: " << camera_name << ", image root: " << FLAGS_image_root;
     cv::Mat image;
     if (FLAGS_image_color == "gray") {
       image = cv::imread(image_path, CV_LOAD_IMAGE_GRAYSCALE);
@@ -351,5 +352,5 @@ int main(int argc, char *argv[]) {
       "command line brew\n"
       "Usage: camera_benchmark <args>\n");
 
-  return apollo::perception::camera::work(argv[1]);
+  return apollo::perception::camera::work();
 }

@@ -1,0 +1,3 @@
+/apollo/modules/perception/testdata/camera/lib/lane/postprocessor/denseline/data/test_1.jpg
+/apollo/modules/perception/testdata/camera/lib/lane/postprocessor/denseline/data/test_2.jpg
+/apollo/modules/perception/testdata/camera/lib/lane/postprocessor/denseline/data/test_4.jpg

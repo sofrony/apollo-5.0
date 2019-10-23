@@ -124,7 +124,7 @@ bool YoloObstacleDetector::InitNet(const yolo::YoloParam &yolo_param,
 
   // init Net
   const auto &model_type = model_param.model_type();
-  AINFO << "model_type=" << model_type;
+  AINFO << "model_type=" << model_type << " protofile="<<proto_file<<" weight_file="<<weight_file;
   inference_.reset(inference::CreateInferenceByName(model_type, proto_file,
                                                     weight_file, output_names,
                                                     input_names, model_root));
