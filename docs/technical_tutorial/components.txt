@@ -1,23 +1,5 @@
-Play only camera from given record
-
-    cyber_recorder play -f record.* -k /apollo/perception/obstacles -k /apollo/prediction -loop
-    mainboard -d /apollo/modules/perception/production/dag/dag_motion_service.dag
-    mainboard -d /apollo/modules/perception/production/dag/dag_streaming_perception_camera.dag
-
-Places where Perception() is used:     ObstacleCameraPerception::Perception(const CameraPerceptionOptions &options, CameraFrame *frame) { } 
-    perception/onboard/component/fusion_camera_detection_component.cc      FusionCameraDetectionComponent::OnReceiveImage()   -> /apollo/perception/obstacles
-    iperception/camera/test/camera_app_obstacle_camera_perception_test.cc     EXPECT_TRUE(perception.Perception(options, &frame));
-    perception/camera/tools/offline/offline_obstacle_pipeline.cc              CHECK(perception.Perception(options, &frame));
-    planning/common/path_decision.cc                                         perception::PerceptionObstacle *PathDecision::FindPerceptionObstacle(
-    planning/navi/decider/navi_obstacle_decider.cc      NaviObstacleDecider::AddObstacleOffsetDirection,IsNeedFilterObstacle
-    planning/scenarios/stop_sign/unprotected/stage_pre_stop.cc    StopSignUnprotectedStagePreStop::AddWatchVehicle()
-    planning/tasks/deciders/path_decider/path_decider.cc     PathDecider::MakeStaticObstacleDecision()
-    planning/tasks/deciders/speed_bounds_decider/st_boundary_mapper.cc  STBoundaryMapper::GetOverlapBoundaryPoints
-    planning/tasks/deciders/speed_decider/speed_decider.cc SpeedDecider::CreateStopDecision(const Obstacle& obstacle),CreateOvertakeDecision,CheckStopForPedestrian()
-    planning/tasks/optimizers/road_graph/trajectory_cost.cc  TrajectoryCost::TrajectoryCost(const DpPolyPathConfig &config, const std::vector<const Obstacle *> &obstacles )
-    planning/traffic_rules/crosswalk.cc   Crosswalk::MakeDecisions, Crosswalk::CheckStopForObstacle(
-
-Apollo componets        
+Apollo componets
+------------------------------------------
 CameraComponent
 FusionCameraDetectionComponent
     Perception  (obstacle_camera_perception.cc)
@@ -33,7 +15,7 @@ FusionCameraDetectionComponent
                 CreateNewTarget //if needed
         transformer_ (MultiCueObstacleTransformer) ->Transform(options, frame)  //for each frame->detected_objects
             Solve3dBbox, Solve3dBboxGivenOneFullBboxDimensionOrientation
-                GetScoreViaRotDimensionCenter //with ObjectTemplateManager
+                GetScoreViaRotDimensionCenter //with ObjectTemplateManager, JaccardIndex (bbox, template projection)
             FillResults //save camera_supplement.size, alpha, direction, center, center_uncertainty, theta_variance
         obstacle_postprocessor_ (LocationRefinerObstaclePostprocessor)->Process(options, frame)
             AdjustCenterWithGround //using GetProjectionScore
@@ -56,20 +38,21 @@ Visualizer
 SegmentationComponent
 LaneDetectionComponent
 FusionComponent  //ProbabilisticFusion
+    HMTrackersObjectsAssociation.Associate
+        GatedHungarianMatcher.Match()
+        ComputeDistance
+            TrackObjectDistance::ComputeRadarCameraSimilarity
+                FuseMultipleProbabilities
     PbfTracker  //Prob fusion tracker
        existance_fusion_->UpdateWithMeasurement(measurement, target_timestamp, options.match_distance);
        motion_fusion_->UpdateWithMeasurement(measurement, target_timestamp); //update velocity, acceleration, center and their uncertainty
        shape_fusion_->UpdateWithMeasurement(measurement, target_timestamp);
        type_fusion_->UpdateWithMeasurement(measurement, target_timestamp);
        track_->UpdateWithSensorObject(measurement);
-    
-    HMTrackersObjectsAssociation
-        GatedHungarianMatcher.Match()
-        ComputeDistance
-            TrackObjectDistance::ComputeRadarCameraSimilarity
-                FuseMultipleProbabilities
-    PbfGatekeeper
-    ComputePolygonDistance3d( const SensorObjectConstPtr& fused_object, const SensorObjectPtr& sensor_object)
+    CreateNewTracks // if needed
+    CollectFusedObjects
+        PbfGatekeeper
+
 RadarDetectionComponent
 CanbusComponent
 FakePredictionComponent
@@ -95,6 +78,7 @@ VelodyneConvertComponent
 ImageDecompressComponent
 PlanningComponent
 PredictionComponent
+    PedestrianInteractionEvaluator (lstm)
 UDPBridgeSenderComponent<pb_msg>
 UDPBridgeReceiverComponent<pb_msg>
 GuardianComponent
@@ -106,4 +90,22 @@ MotionService
 TrafficLightsPerceptionComponent
 LidarOutputComponent
 RecognitionComponent
+
+Play only camera from given record:
+    cyber_recorder play -f record.* -k /apollo/perception/obstacles -k /apollo/prediction -loop
+    mainboard -d /apollo/modules/perception/production/dag/dag_motion_service.dag
+    mainboard -d /apollo/modules/perception/production/dag/dag_streaming_perception_camera.dag
+
+Places where Perception() is used:     ObstacleCameraPerception::Perception(const CameraPerceptionOptions &options, CameraFrame *frame) { }
+    perception/onboard/component/fusion_camera_detection_component.cc      FusionCameraDetectionComponent::OnReceiveImage()   -> /apollo/perception/obstacles
+    iperception/camera/test/camera_app_obstacle_camera_perception_test.cc     EXPECT_TRUE(perception.Perception(options, &frame));
+    perception/camera/tools/offline/offline_obstacle_pipeline.cc              CHECK(perception.Perception(options, &frame));
+    planning/common/path_decision.cc                                         perception::PerceptionObstacle *PathDecision::FindPerceptionObstacle(
+    planning/navi/decider/navi_obstacle_decider.cc      NaviObstacleDecider::AddObstacleOffsetDirection,IsNeedFilterObstacle
+    planning/scenarios/stop_sign/unprotected/stage_pre_stop.cc    StopSignUnprotectedStagePreStop::AddWatchVehicle()
+    planning/tasks/deciders/path_decider/path_decider.cc     PathDecider::MakeStaticObstacleDecision()
+    planning/tasks/deciders/speed_bounds_decider/st_boundary_mapper.cc  STBoundaryMapper::GetOverlapBoundaryPoints
+    planning/tasks/deciders/speed_decider/speed_decider.cc SpeedDecider::CreateStopDecision(const Obstacle& obstacle),CreateOvertakeDecision,CheckStopForPedestrian()
+    planning/tasks/optimizers/road_graph/trajectory_cost.cc  TrajectoryCost::TrajectoryCost(const DpPolyPathConfig &config, const std::vector<const Obstacle *> &obstacles )
+    planning/traffic_rules/crosswalk.cc   Crosswalk::MakeDecisions, Crosswalk::CheckStopForObstacle(
 
