@@ -1,7 +1,7 @@
 Apollo componets
 ------------------------------------------
 CameraComponent
-FusionCameraDetectionComponent
+FusionCameraDetectionComponent -> PerceptionObstacles
     Perception  (obstacle_camera_perception.cc)
         calibration_service->Update(frame);
         tracker (OMTObstacleTracker)->Predict(tracker_options, frame) //for each target
@@ -77,8 +77,34 @@ StaticTransformComponent
 VelodyneConvertComponent
 ImageDecompressComponent
 PlanningComponent
-PredictionComponent
-    PedestrianInteractionEvaluator (lstm)
+PredictionComponent  -> PredictionObstacles
+    OnLocalization
+    OnPlanning
+    OnPerception
+        ScenarioAnalyzer::Analyze
+            CruiseScenarioFeatures::BuildCruiseScenarioFeatures (lanes)
+            JunctionScenarioFeatures::BuildJunctionScenarioFeatures
+        EvaluatorManager::Run
+            SemanticMap::RunCurrFrame
+                    common::util::LRUCache<int, int> id_mapping_;
+                DrawBaseMap
+                    img_show_semantic_map, enable_async_draw_base_image
+                        "Demo window" with cv::Mat(2000, 2000, CV_8UC3, cv::Scalar(0, 0, 0));
+            EvaluateObstacle
+                PedestrianInteractionEvaluator::Evaluate
+                    lstm_inputs.push_back(std::move(lstm_input.to(device_)));
+                    torch_single_lstm_.forward(torch_position_embedding_.forwar(location))
+                    torch_prediction_layer_.forward(prediction_inputs)
+                    torch_social_embedding_.forward  //not in use
+                LaneAggregatingEvaluator (torch)
+                LaneScanningEvaluator (torch)
+                CruiseMLPEvaluator (torch)
+                semantic_lstm_evaluator
+                JunctionAnalyzer (overlapping, extends out - exits)
+                    BFS to find all connected exit lanes
+                    int max_search_level = 6;
+        PredictorManager
+
 UDPBridgeSenderComponent<pb_msg>
 UDPBridgeReceiverComponent<pb_msg>
 GuardianComponent
