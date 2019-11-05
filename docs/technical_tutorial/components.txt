@@ -35,8 +35,7 @@ Visualizer
     yaw = static_cast<float>(atan2(sin(object->theta), cos(object->theta))));
     rotate << cos(yaw), -sin(yaw), sin(yaw), cos(yaw);
     points = rotate * (object->size(0) * 0.5, object->size(1) * 0.5) + (object->center(0), object->center(1));
-SegmentationComponent
-LaneDetectionComponent
+
 FusionComponent  //ProbabilisticFusion
     HMTrackersObjectsAssociation.Associate
         GatedHungarianMatcher.Match()
@@ -53,13 +52,75 @@ FusionComponent  //ProbabilisticFusion
     CollectFusedObjects
         PbfGatekeeper
 
+
+PredictionComponent  -> PredictionObstacles
+    OnLocalization
+    OnPlanning
+    OnPerception
+        ScenarioAnalyzer::Analyze
+            CruiseScenarioFeatures::BuildCruiseScenarioFeatures (lanes)
+            JunctionScenarioFeatures::BuildJunctionScenarioFeatures
+        EvaluatorManager::Run
+            SemanticMap::RunCurrFrame
+                    common::util::LRUCache<int, int> id_mapping_;
+                DrawBaseMap
+                    img_show_semantic_map, enable_async_draw_base_image
+                        "Demo window" with cv::Mat(2000, 2000, CV_8UC3, cv::Scalar(0, 0, 0));
+            EvaluateObstacle
+                PedestrianInteractionEvaluator::Evaluate
+                    torch_social_embedding_.forward  //not in use
+                    torch_prediction_layer(torch_single_lstm(torch_position_embedding_(trajectory)), torch_single_lstm(location))
+                LaneAggregatingEvaluator (torch)
+                LaneScanningEvaluator (torch)
+                CruiseMLPEvaluator (torch)
+                semantic_lstm_evaluator
+                JunctionAnalyzer (overlapping, extends out - exits)
+                    BFS to find all connected exit lanes
+                    int max_search_level = 6;
+        PredictorManager:Run
+            predictor->Predict //for VEHICLE, BICYCLE, PEDESTRIAN(RegionalPredictor)
+                RegionalPredictor::GenerateMovingTrajectory
+            TrimTrajectory
+
+PlanningComponent
+    OnLanePlanning
+        VehicleStateProvider::Update
+        // if i!status.ok()
+             ptr_trajectory_pb->set_gear(canbus::Chassis::GEAR_DRIVE);
+             FillPlanningPb(start_timestamp, ptr_trajectory_pb);
+             GenerateStopTrajectory(ptr_trajectory_pb); return;
+        TrajectoryStitcher::ComputeStitchingTrajectory
+        EgoInfo::Instance()->Update(stitching_trajectory.back(), vehicle_state);
+        EgoInfo::Instance()->CalculateFrontObstacleClearDistance( frame_->obstacles()); }
+        InitFrame //for history
+        Plan(stitching_trajectory, ptr_trajectory_pb)
+            planner_->Plan(stitching_trajectory.back(), frame_.get(), ptr_trajectory_pb);
+                PlanOnReferenceLine
+                scenario_->Process(planning_start_point, frame);
+            copy(best_ref_path.begin() + 1, best_ref_path.end(), std::back_inserter(current_frame_planned_path));
+        FillPlanningPb
+        planning_smoother_.Smooth
+
+
+SegmentationComponent
+LaneDetectionComponent
+UDPBridgeSenderComponent<pb_msg>
+UDPBridgeReceiverComponent<pb_msg>
+GuardianComponent
+RoutingComponent
+Monitor
+ThirdPartyPerceptionComponent
+RelativeMapComponent
+MotionService
+TrafficLightsPerceptionComponent
+LidarOutputComponent
+RecognitionComponent
 RadarDetectionComponent
 CanbusComponent
 FakePredictionComponent
 ManualTrafficLight
 CompensatorComponent
     MotionCompensation //set TransformStamped: translation,rotation
-
 ControlComponent
 RTKLocalizationComponent
 NDTLocalizationComponent
@@ -76,51 +137,14 @@ VelodyneDriverComponent
 StaticTransformComponent
 VelodyneConvertComponent
 ImageDecompressComponent
-PlanningComponent
-PredictionComponent  -> PredictionObstacles
-    OnLocalization
-    OnPlanning
-    OnPerception
-        ScenarioAnalyzer::Analyze
-            CruiseScenarioFeatures::BuildCruiseScenarioFeatures (lanes)
-            JunctionScenarioFeatures::BuildJunctionScenarioFeatures
-        EvaluatorManager::Run
-            SemanticMap::RunCurrFrame
-                    common::util::LRUCache<int, int> id_mapping_;
-                DrawBaseMap
-                    img_show_semantic_map, enable_async_draw_base_image
-                        "Demo window" with cv::Mat(2000, 2000, CV_8UC3, cv::Scalar(0, 0, 0));
-            EvaluateObstacle
-                PedestrianInteractionEvaluator::Evaluate
-                    lstm_inputs.push_back(std::move(lstm_input.to(device_)));
-                    torch_single_lstm_.forward(torch_position_embedding_.forwar(location))
-                    torch_prediction_layer_.forward(prediction_inputs)
-                    torch_social_embedding_.forward  //not in use
-                LaneAggregatingEvaluator (torch)
-                LaneScanningEvaluator (torch)
-                CruiseMLPEvaluator (torch)
-                semantic_lstm_evaluator
-                JunctionAnalyzer (overlapping, extends out - exits)
-                    BFS to find all connected exit lanes
-                    int max_search_level = 6;
-        PredictorManager
-
-UDPBridgeSenderComponent<pb_msg>
-UDPBridgeReceiverComponent<pb_msg>
-GuardianComponent
-RoutingComponent
-Monitor
-ThirdPartyPerceptionComponent
-RelativeMapComponent
-MotionService
-TrafficLightsPerceptionComponent
-LidarOutputComponent
-RecognitionComponent
 
 Play only camera from given record:
     cyber_recorder play -f record.* -k /apollo/perception/obstacles -k /apollo/prediction -loop
     mainboard -d /apollo/modules/perception/production/dag/dag_motion_service.dag
     mainboard -d /apollo/modules/perception/production/dag/dag_streaming_perception_camera.dag
+
+Run perception offline:
+    bazel run //modules/perception/camera/tools/offline:offline_obstacle_pipeline
 
 Places where Perception() is used:     ObstacleCameraPerception::Perception(const CameraPerceptionOptions &options, CameraFrame *frame) { }
     perception/onboard/component/fusion_camera_detection_component.cc      FusionCameraDetectionComponent::OnReceiveImage()   -> /apollo/perception/obstacles
