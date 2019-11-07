@@ -60,6 +60,11 @@ PredictionComponent  -> PredictionObstacles
         ScenarioAnalyzer::Analyze
             CruiseScenarioFeatures::BuildCruiseScenarioFeatures (lanes)
             JunctionScenarioFeatures::BuildJunctionScenarioFeatures
+        BuildLaneGraph
+        RightOfWay::Analyze();
+        InsertFeatureProto
+            GetObstacleWithLRUUpdate
+            Obstacle::Create
         EvaluatorManager::Run
             SemanticMap::RunCurrFrame
                     common::util::LRUCache<int, int> id_mapping_;
@@ -73,10 +78,8 @@ PredictionComponent  -> PredictionObstacles
                 LaneAggregatingEvaluator (torch)
                 LaneScanningEvaluator (torch)
                 CruiseMLPEvaluator (torch)
-                semantic_lstm_evaluator
                 JunctionAnalyzer (overlapping, extends out - exits)
-                    BFS to find all connected exit lanes
-                    int max_search_level = 6;
+                    BFS to find all connected exit lanes // int max_search_level = 6;
         PredictorManager:Run
             predictor->Predict //for VEHICLE, BICYCLE, PEDESTRIAN(RegionalPredictor)
                 RegionalPredictor::GenerateMovingTrajectory
@@ -85,19 +88,36 @@ PredictionComponent  -> PredictionObstacles
 PlanningComponent
     OnLanePlanning
         VehicleStateProvider::Update
-        // if i!status.ok()
+        if !status.ok()
              ptr_trajectory_pb->set_gear(canbus::Chassis::GEAR_DRIVE);
              FillPlanningPb(start_timestamp, ptr_trajectory_pb);
              GenerateStopTrajectory(ptr_trajectory_pb); return;
         TrajectoryStitcher::ComputeStitchingTrajectory
         EgoInfo::Instance()->Update(stitching_trajectory.back(), vehicle_state);
         EgoInfo::Instance()->CalculateFrontObstacleClearDistance( frame_->obstacles()); }
-        InitFrame //for history
         Plan(stitching_trajectory, ptr_trajectory_pb)
-            planner_->Plan(stitching_trajectory.back(), frame_.get(), ptr_trajectory_pb);
+            LatticePlanner,
+            NaviPlanner // real-time relative map
                 PlanOnReferenceLine
-                scenario_->Process(planning_start_point, frame);
+            PublicRoadPlanner::Plan(stitching_trajectory.back(), frame_.get(), ptr_trajectory_pb);
+                scenario::Process(planning_start_point, frame);
+                    LaneFollowScenario
+                        LaneChangeDecider
+                    EmergencyPullOverScenario
+                    NarrowStreetUTurnScenario
+                    BareIntersectionUnprotectedScenario
+                    ValetParkingScenario
+                    ParkAndGoScenario
+                    StopSignUnprotectedScenario
+                    TrafficLightProtectedScenario
+                    TrafficLightUnprotectedRightTurnScenario
+                    YieldSignScenario
+
             copy(best_ref_path.begin() + 1, best_ref_path.end(), std::back_inserter(current_frame_planned_path));
+        GenerateSpeedProfile
+            GenerateSpeedProfilesForCruising
+            GenerateSpeedProfilesForStopping
+            GenerateSpeedProfilesForPathTimeObstacles
         FillPlanningPb
         planning_smoother_.Smooth
 
